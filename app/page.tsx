@@ -1,3 +1,4 @@
+// Triggering Vercel rebuild to inject the Supabase environment variables
 import { createClient } from '@/utils/supabase/server'
 import { cookies } from 'next/headers'
 
