@@ -19,7 +19,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
   Bell, 
   Search, 
-  BookOpen, 
   Award, 
   Clock, 
   Sparkles 
@@ -117,8 +116,8 @@ export default function DashboardClient({ initialCourses }: DashboardClientProps
                   </div>
 
                   {/* Course Cards */}
-                  {courses.map((course) => (
-                    <CourseCard key={course.id} course={course} />
+                  {courses.map((course, i) => (
+                    <CourseCard key={course.id} course={course} index={i} />
                   ))}
                 </BentoGrid>
               )}
@@ -143,51 +142,10 @@ export default function DashboardClient({ initialCourses }: DashboardClientProps
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {courses.map((course) => {
-                      const glowClass = course.progress >= 80 ? "shadow-cyan-500/5" : "shadow-purple-500/5";
-                      return (
-                        <article 
-                          key={course.id}
-                          className={`glass-card rounded-2xl p-6 flex flex-col justify-between hover:scale-[1.01] transition-all duration-300 relative group overflow-hidden ${glowClass}`}
-                        >
-                          <div className="gradient-mesh opacity-30" />
-                          <div className="relative z-10 flex gap-5 items-start">
-                            <div className="p-3 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400 shrink-0">
-                              <BookOpen className="w-6 h-6" />
-                            </div>
-                            <div className="flex-1 space-y-2">
-                              <div className="flex justify-between items-start gap-2">
-                                <h4 className="font-bold text-lg text-white font-sans group-hover:text-purple-300 transition-colors leading-tight">
-                                  {course.title}
-                                </h4>
-                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border border-purple-500/20 bg-purple-500/10 text-purple-400 shrink-0 uppercase">
-                                  Active
-                                </span>
-                              </div>
-                              <p className="text-xs text-zinc-400 font-sans line-clamp-2">
-                                Master fundamental patterns, compile assets, and deploy state-of-the-art applications under production conditions.
-                              </p>
-                              
-                              <div className="pt-4 space-y-2">
-                                <div className="flex justify-between text-xs">
-                                  <span className="text-zinc-500 font-sans">Module Progress</span>
-                                  <span className="font-bold text-purple-400 font-sans">{course.progress}% Completed</span>
-                                </div>
-                                <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden">
-                                  <motion.div
-                                    initial={{ width: 0 }}
-                                    animate={{ width: `${course.progress}%` }}
-                                    transition={{ type: "spring", stiffness: 80, damping: 15 }}
-                                    className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 rounded-full"
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </article>
-                      );
-                    })}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    {courses.map((course, i) => (
+                      <CourseCard key={course.id} course={course} index={i} />
+                    ))}
                   </div>
                 </section>
               )}
