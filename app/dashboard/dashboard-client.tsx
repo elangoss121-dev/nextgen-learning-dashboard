@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import Sidebar from "@/components/sidebar";
-import { BentoGrid } from "@/components/bento-grid";
+import { BentoGrid, BentoGridItem } from "@/components/bento-grid";
 import HeroTile from "@/components/hero-tile";
 import CourseCard from "@/components/course-card";
 import dynamic from "next/dynamic";
@@ -105,22 +105,29 @@ export default function DashboardClient({ initialCourses }: DashboardClientProps
               {/* Tab View: Dashboard / Bento Grid */}
               {activeTab === "dashboard" && (
                 <BentoGrid>
-                  {/* Hero Tile - spans 3 columns on desktop, 2 on tablet, 1 on mobile */}
-                  <div className="col-span-1 md:col-span-2 lg:col-span-3 min-h-[220px] glass-card rounded-2xl relative overflow-hidden group">
+                  {/* Hero Tile — spans 3 cols desktop, 2 tablet, 1 mobile */}
+                  <BentoGridItem
+                    as="div"
+                    className="col-span-1 md:col-span-2 lg:col-span-3 min-h-[220px] p-0"
+                  >
                     <HeroTile />
-                  </div>
+                  </BentoGridItem>
 
-                  {/* Activity Heatmap Tile - spans 1 column */}
-                  <div className="col-span-1 md:col-span-2 lg:col-span-1 min-h-[220px] glass-card rounded-2xl relative overflow-hidden group p-6">
+                  {/* Activity Heatmap Tile — spans 1 col */}
+                  <BentoGridItem
+                    as="aside"
+                    className="col-span-1 md:col-span-2 lg:col-span-1 min-h-[220px] p-6"
+                  >
                     <ActivityTile />
-                  </div>
+                  </BentoGridItem>
 
-                  {/* Course Cards */}
+                  {/* Course Cards — each is motion.article with its own spring entrance */}
                   {courses.map((course, i) => (
                     <CourseCard key={course.id} course={course} index={i} />
                   ))}
                 </BentoGrid>
               )}
+
 
               {/* Tab View: Courses */}
               {activeTab === "courses" && (

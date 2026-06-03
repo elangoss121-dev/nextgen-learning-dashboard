@@ -1,113 +1,155 @@
-# Aether | Futuristic Student Learning Dashboard
+# Aether — Next-Gen Student Learning Dashboard
 
-Aether is a production-ready Student Learning Dashboard featuring a dark, premium glassmorphism SaaS aesthetic built with Next.js 15, TypeScript, Tailwind CSS v4, Framer Motion, Supabase, and Lucide React Icons.
+A high-fidelity **Bento Grid** student dashboard built for the Frontend Intern Challenge. Features server-rendered live data from Supabase, hardware-accelerated Framer Motion animations with spring physics, and a dark glassmorphism design system.
 
----
-
-## 🌌 Theme & Design System
-
-- **Dark Mode Only**: Base color is `#09090B` (near-black) for a sleek, hardware-like surface.
-- **Glassmorphism**: Cards use `backdrop-filter: blur(12px)` and semi-transparent borders (`border-white/5`) combined with subtle glowing radial gradients (`gradient-mesh`).
-- **Layout**: Bento Grid structure that collapses responsively across different viewport break-points.
-- **Typography**: Uses Vercel's optimized `Geist` variable sans-serif font family.
+🔗 **Live Demo**: [nextgen-learning-dashboard-delta.vercel.app](https://nextgen-learning-dashboard-delta.vercel.app)
 
 ---
 
-## 🏗️ Architecture: Server vs. Client Component Split
+## Stack
 
-To maximize performance, SEO ranking, and page loading speed, this project implements a clear boundaries separation:
+| Layer | Technology |
+|---|---|
+| Framework | Next.js 15 (App Router) |
+| Language | TypeScript (strict) |
+| Styling | Tailwind CSS v4 |
+| Animations | Framer Motion |
+| Icons | Lucide React |
+| Database | Supabase (PostgreSQL) |
+| SSR Client | `@supabase/ssr` |
+| Deployment | Vercel |
 
-```mermaid
-graph TD
-  A[Server: page.tsx] -->|Fetch courses server-side| B(createServerSupabaseClient)
-  A -->|Pass course data as initial props| C["Client: DashboardClient"]
-  C --> D[Sidebar - collapsible/tabs]
-  C --> E[BentoGrid - animation container]
-  E --> F[HeroTile - quote/streak]
-  E --> G[ActivityTile - heatmap/hours]
-  E --> H[CourseCard - spring-animated progress]
+---
+
+## Architecture: Server / Client Component Split
+
+```
+app/dashboard/page.tsx          ← Server Component (RSC)
+  │  getCourses() via @supabase/ssr
+  │  Passes data as props ↓
+  └─ DashboardClient.tsx         ← Client Component ("use client")
+       ├─ Sidebar.tsx            ← layoutId spring nav highlight
+       └─ BentoGrid.tsx          ← staggerChildren container
+            ├─ BentoGridItem     ← spring entrance + spring hover
+            │    ├─ HeroTile     ← greeting, streak, daily quote
+            │    └─ ActivityTile ← contribution heatmap (SSR-disabled)
+            └─ CourseCard ×N     ← motion.article, spring progress bar
 ```
 
-### 1. Server Components
-- **`app/dashboard/page.tsx`**: Responsible for initiating database queries. Calls the server action `getCourses()` directly.
-- **`lib/supabase.ts`**: Builds the Supabase Server Client using `@supabase/ssr` cookies. Awaits Next.js 15 async cookie stores.
-- **`lib/actions.ts`**: Integrates server action database fetching. Fallback data triggers automatically on connection warnings.
+### Why this split?
 
-### 2. Client Components (`"use client"`)
-- **`app/dashboard/dashboard-client.tsx`**: Coordinates active tab selection (Overview, Courses, Analytics, Settings) and manages viewport margins.
-- **`components/sidebar.tsx`**: Leverages Framer Motion's `layoutId="active-tab"` to slide the nav background highlight smoothly.
-- **`components/bento-grid.tsx`**: Sets up entry animation variants (`staggerChildren: 0.15`) that trigger as the cards resolve.
-- **`components/course-card.tsx`**: Animates the progress bar width from `0%` to target `%` on load using a `spring` animation over 1.5s.
-- **`components/activity-tile.tsx`**: Manages interactive hover tracking and states for the daily study hours heatmap.
-- **`components/skeleton-card.tsx`**: Displays shimmering placeholder tiles during resource load.
-- **`app/dashboard/loading.tsx`** & **`app/dashboard/error.tsx`**: Render layout shells and error catchers with entry transitions.
+**Server Components** (`page.tsx`, `lib/actions.ts`, `lib/supabase.ts`) run exclusively on the server — they have access to `process.env` secrets, perform the Supabase query, and ship zero JavaScript to the client. This means the first HTML response already contains the rendered course data (no client-side waterfall).
+
+**Client Components** handle all interactivity: tab switching, Framer Motion animations, hover states, and the date/quote display (which must run in the browser to avoid hydration mismatches from `new Date()`).
+
+The `ActivityTile` is dynamically imported with `ssr: false` because it uses browser-only `requestAnimationFrame` logic and would cause a hydration mismatch if SSR'd.
 
 ---
 
-## 🛠️ Database Setup (Supabase)
+## Animation Design
 
-Create the `courses` table and seed initial items by running the script in [schema.sql](file:///d:/Next-gen%20Learning/schema.sql) within your Supabase SQL Editor:
+### Staggered Entrance
+`BentoGrid` uses Framer Motion `variants` with `staggerChildren: 0.12`. Each `BentoGridItem` and `CourseCard` declares a `hidden → visible` variant, so they cascade in sequentially — fading in while translating 30px upward on the Y axis.
+
+### Spring Physics
+All entrance and hover transitions use `type: "spring", stiffness: 300, damping: 20` — producing a natural, non-linear deceleration instead of a CSS cubic-bezier curve.
+
+### Zero Layout Shifts
+Every hover and entrance animation touches **only `transform` (scale, translateY) and `opacity`**. No `width`, `height`, `margin`, `padding`, or `top/left` properties are animated, which keeps the browser in the compositor thread and eliminates layout repaints.
+
+### Sidebar `layoutId`
+The active nav highlight is a shared `motion.div` with `layoutId="active-tab"`. When you switch tabs, Framer Motion automatically calculates the delta between the old and new positions and animates between them using spring physics — without any manual position calculation.
+
+### Progress Bars
+Each course card's progress bar animates from `width: 0%` to `width: {progress}%` using `type: "spring", stiffness: 80, damping: 15`, delayed by the card's index to reinforce the stagger.
+
+---
+
+## Data Integration
+
+### Supabase Schema
 
 ```sql
 create table courses (
-  id uuid primary key default gen_random_uuid(),
-  title text not null,
-  progress integer not null,
-  icon_name text not null,
-  created_at timestamp with time zone default now()
+  id            uuid primary key default gen_random_uuid(),
+  title         text not null,
+  progress      integer not null check (progress between 0 and 100),
+  icon_name     text not null,
+  created_at    timestamp with time zone default now(),
+  -- Extended fields (optional, gracefully fallback if absent)
+  subject       text default 'General',
+  color         text default 'purple',
+  lessons_total integer default 20,
+  lessons_done  integer default 0,
+  instructor    text default 'Instructor'
 );
 
-insert into courses (title, progress, icon_name) values
-('Advanced React Patterns', 75, 'Code2'),
-('Next.js Mastery', 45, 'Monitor'),
-('TypeScript Deep Dive', 90, 'FileCode'),
-('Full Stack Development', 60, 'Layers');
+-- Enable RLS + allow anon read
+alter table courses enable row level security;
+create policy "anon_select" on courses for select to anon using (true);
+grant select on courses to anon;
 ```
+
+### Loading States
+`app/dashboard/loading.tsx` renders a full skeleton grid (via `SkeletonBentoGrid`) that matches the real layout exactly — same column spans, same card heights — so there is no visual jump when data resolves.
+
+### Error Handling
+If Supabase is unreachable or the table doesn't exist, `getCourses()` catches the error, logs a warning, and returns 8 high-fidelity fallback courses. The UI never crashes or shows an error screen on first load.
 
 ---
 
-## ⚙️ Environment Variables
+## Environment Variables
 
-Copy `.env.example` to `.env.local` and substitute your Supabase API coordinates:
+Copy `.env.example` to `.env.local`:
 
 ```bash
 cp .env.example .env.local
 ```
 
 ```env
-NEXT_PUBLIC_SUPABASE_URL=https://your-supabase-project-id.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key-string
+NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 ```
 
-> **Security note**: The `NEXT_PUBLIC_SUPABASE_ANON_KEY` is safe to expose
-> in the browser because Supabase's Row Level Security (RLS) enforces
-> access control at the database level. The anon key only grants permissions
-> that RLS explicitly allows — it is not a secret.
-
-*Note: If the environment variables are not supplied or match the default template, the dashboard falls back to standard mock datasets automatically, logging a warning rather than crashing.*
+> The anon key is safe for `NEXT_PUBLIC_` because Supabase RLS restricts which rows it can read. It cannot perform writes unless an explicit INSERT policy exists.
 
 ---
 
-## 🚀 Getting Started
+## Responsive Behaviour
 
-First, install the packages and launch the hot-reloading development server:
-
-```bash
-npm run dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) with your browser to preview.
-
-To verify a production bundle build:
-
-```bash
-npm run build
-```
+| Breakpoint | Sidebar | Grid |
+|---|---|---|
+| Desktop `> 1024px` | Full sidebar (icons + labels) | 4-column bento |
+| Tablet `768–1024px` | Icon-only sidebar (`w-20`) | 2-column bento |
+| Mobile `< 768px` | Hidden; bottom nav bar | Single-column scroll |
 
 ---
 
-## 🎨 Animation Guidelines (Framer Motion)
+## Challenges Faced
 
-- **Entry Staggering**: Tiles enter sequentially using CSS transform (`y: 30 → 0`) and opacity (`0 → 1`) with spring stiffness `300` and damping `20`.
-- **Card Hovers**: Scaled up to `1.02` with custom radial glows. Restricts all hover motion to `transform` and `opacity` properties, ensuring **zero layout shifts** and hardware acceleration.
-- **Springs**: Progress tracks animate from `0% → progress%` on load using a 1.5s spring easing (`stiffness: 80, damping: 15`).
+### 1. Next.js 15 Async Cookie Store
+`@supabase/ssr`'s `createServerClient` requires synchronous cookie access, but Next.js 15 made `cookies()` return a `Promise`. The fix was to `await cookies()` before passing it to `createServerClient`, and mark the wrapper function `async`.
+
+### 2. Hydration Mismatches from `new Date()`
+`HeroTile` originally rendered the current date on the server and client. Since the server renders during build/request time and the client renders milliseconds later, React threw a hydration mismatch. Fix: moved date formatting into a `useEffect` with an empty initial state (`""`), so the server always renders an empty string and the client fills it in after mount.
+
+### 3. ActivityTile SSR Incompatibility
+The heatmap uses `requestAnimationFrame` and canvas-like DOM measurements. Running this on the server would crash with "window is not defined". Fix: `next/dynamic` with `ssr: false` — the server ships a placeholder skeleton, the client hydrates and mounts the real tile.
+
+### 4. Framer Motion `layoutId` Across Tab Re-renders
+When `AnimatePresence` unmounts a tab and remounts another, shared `layoutId` elements can flicker if not wrapped correctly. Fix: ensured the `layoutId="active-tab"` div is always rendered inside the same `AnimatePresence` boundary, with a stable `key` on the outer animated wrapper.
+
+### 5. Tailwind v4 Config Differences
+Tailwind CSS v4 removed `tailwind.config.js` and replaced it with CSS-native `@theme` blocks inside `globals.css`. All custom design tokens (colors, animations, keyframes) were migrated to the `@theme {}` block.
+
+---
+
+## Getting Started
+
+```bash
+npm install
+cp .env.example .env.local   # fill in your Supabase keys
+npm run dev                  # http://localhost:3000
+```
+
+To seed the Supabase database, run the SQL in [`supabase/seed.sql`](./supabase/seed.sql) in your Supabase SQL Editor.
